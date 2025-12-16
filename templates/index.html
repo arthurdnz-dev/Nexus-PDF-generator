@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerar PDF das Fotos</title>
+</head>
+<body>
+
+<h1>Gerar PDF das Fotos</h1>
+
+<input type="file" id="photos" multiple accept="image/*">
+<br><br>
+
+<button onclick="generatePDF()">Executar</button>
+
+<p id="status"></p>
+<a id="download" href="#" style="display:none;">Baixar PDF</a>
+
+<script>
+function generatePDF() {
+    const files = document.getElementById("photos").files;
+    if (files.length === 0) {
+        alert("Selecione imagens");
+        return;
+    }
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append("photos", files[i]);
+    }
+
+    document.getElementById("status").innerText = "Gerando PDF...";
+
+    fetch("/generate", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("status").innerText = "PDF pronto!";
+        const link = document.getElementById("download");
+        link.href = data.download_url;
+        link.style.display = "block";
+    })
+    .catch(() => {
+        document.getElementById("status").innerText = "Erro ao gerar PDF";
+    });
+}
+</script>
+
+</body>
+</html>

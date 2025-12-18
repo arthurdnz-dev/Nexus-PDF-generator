@@ -1,5 +1,3 @@
-#arquivo main_window.py
-
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 from PIL import Image
@@ -14,6 +12,18 @@ class AppInterface(ctk.CTk):
         
         self.title("Nexus PDF Generator - Manual Selection")
         self.geometry("1100x700")
+
+        # --- CONFIGURAÇÃO DO ÍCONE ---
+        # Definindo o caminho e nome conforme solicitado
+        # Nota: O arquivo deve ser .ico para funcionar perfeitamente no Windows
+        caminho_icone = r"C:\Users\alkeb\Downloads\Nexus logo.ico"
+        
+        if os.path.exists(caminho_icone):
+            try:
+                self.iconbitmap(caminho_icone)
+            except Exception as e:
+                print(f"Erro ao carregar ícone: {e}")
+        # -----------------------------
         
         # Configuração de Layout
         self.grid_columnconfigure(1, weight=1)
@@ -28,7 +38,7 @@ class AppInterface(ctk.CTk):
         
         ctk.CTkLabel(self.sidebar, text="NEXUS ENGINE", font=ctk.CTkFont(size=22, weight="bold")).grid(row=0, column=0, padx=20, pady=(30, 40))
 
-        # MUDANÇA AQUI: Botão agora seleciona ARQUIVOS
+        # Botão para selecionar arquivos
         self.btn_origem = ctk.CTkButton(
             self.sidebar, text="🖼️ Selecionar Imagens",
             command=self._acao_selecionar_arquivos,
@@ -61,14 +71,12 @@ class AppInterface(ctk.CTk):
         self.lista_fotos.pack(fill="both", expand=True)
 
     def _acao_selecionar_arquivos(self):
-        """Abre o explorador permitindo selecionar múltiplos arquivos específicos."""
         arquivos = filedialog.askopenfilenames(
             title="Selecione as fotos para o PDF",
             filetypes=[("Imagens", "*.jpg *.jpeg *.png *.bmp")]
         )
         
         if arquivos:
-            # Converte a tupla de arquivos em lista para o motor processar
             self.lista_caminhos_arquivos = list(arquivos)
             self._renderizar_miniaturas()
 
@@ -78,7 +86,6 @@ class AppInterface(ctk.CTk):
             self.path_destino = caminho
 
     def _renderizar_miniaturas(self):
-        """Mostra as fotos escolhidas com miniaturas."""
         for widget in self.lista_fotos.winfo_children():
             widget.destroy()
             
@@ -95,7 +102,6 @@ class AppInterface(ctk.CTk):
                 ctk.CTkLabel(card, image=img_ctk, text="").pack(side="left", padx=15, pady=5)
                 ctk.CTkLabel(card, text=nome_arquivo, font=ctk.CTkFont(size=13)).pack(side="left", padx=5)
                 
-                # Botão para remover item individual da lista (Opcional - Toque Sênior)
                 btn_remover = ctk.CTkButton(card, text="X", width=30, fg_color="#e55353", hover_color="#b03a3a",
                                            command=lambda p=caminho_full: self._remover_item(p))
                 btn_remover.pack(side="right", padx=15)
@@ -113,7 +119,6 @@ class AppInterface(ctk.CTk):
             return
 
         self.btn_gerar.configure(state="disabled", text="GERANDO...")
-        # Note: Precisamos ajustar o motor para receber uma LISTA em vez de uma PASTA
         self.engine.processar_lista_arquivos(self.lista_caminhos_arquivos, self.path_destino, nome)
 
     def notificar_sucesso(self, caminho):

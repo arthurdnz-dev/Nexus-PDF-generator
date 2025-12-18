@@ -1,5 +1,3 @@
-#arquivo engine.py
-
 import os
 import threading
 from PIL import Image
@@ -19,24 +17,24 @@ class PDFGeneratorEngine:
         self.callback_erro = callback_erro
         self.formatos_aceitos = ('.jpg', '.jpeg', '.png', '.bmp')
 
-    def processar_em_background(self, pasta_origem, pasta_destino, nome_arquivo):
+    def processar_lista_arquivos(self, lista_arquivos, pasta_destino, nome_arquivo):
         """
-        Inicia a geração em uma Thread separada.
-        Isso impede que a interface do usuário 'congele' durante o processamento.
+        Inicia a geração do PDF a partir de uma lista específica de arquivos.
+        Executado em uma Thread separada para não congelar a UI.
         """
         job = threading.Thread(
-            target=self._gerar_pdf,
-            args=(pasta_origem, pasta_destino, nome_arquivo),
+            target=self._gerar_pdf_da_lista,
+            args=(lista_arquivos, pasta_destino, nome_arquivo),
             daemon=True
         )
         job.start()
 
-    def _gerar_pdf(self, origem, destino, nome):
+    def _gerar_pdf_da_lista(self, caminhos_imagens, destino, nome):
         """Método privado que executa a lógica pesada de I/O e conversão."""
         try:
-            # Validação de Segurança
-            if not os.path.exists(origem):
-                raise FileNotFoundError(f"Diretório não encontrado: {origem}")
+            # Garante que a pasta de destino exista
+            if not os.path.exists(destino):
+                os.makedirs(destino, exist_ok=True)
 
             caminho_final = os.path.join(destino, f"{nome}.pdf")
             
@@ -44,15 +42,12 @@ class PDFGeneratorEngine:
             pdf = canvas.Canvas(caminho_final, pagesize=A4)
             largura_a4, altura_a4 = A4
 
-            # Listagem e Filtragem (Apenas imagens válidas)
-            arquivos = [f for f in os.listdir(origem) if f.lower().endswith(self.formatos_aceitos)]
-            arquivos.sort() # Garante ordem alfabética no PDF
+            if not caminhos_imagens:
+                raise Exception("Nenhuma imagem selecionada para o processamento.")
 
-            if not arquivos:
-                raise Exception("A pasta selecionada não contém imagens suportadas.")
-
-            for arquivo in arquivos:
-                caminho_img = os.path.join(origem, arquivo)
+            for caminho_img in caminhos_imagens:
+                if not os.path.exists(caminho_img):
+                    continue
                 
                 # Processamento de Imagem com Pillow (PIL)
                 with Image.open(caminho_img) as img:
@@ -78,9 +73,11 @@ class PDFGeneratorEngine:
 
             pdf.save() # Escreve o arquivo no disco
 
+            # Comunicação de sucesso via callback
             if self.callback_sucesso:
                 self.callback_sucesso(caminho_final)
 
         except Exception as e:
+            # Comunicação de erro via callback
             if self.callback_erro:
                 self.callback_erro(str(e))

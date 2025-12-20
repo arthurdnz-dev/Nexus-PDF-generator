@@ -7,77 +7,73 @@ from reportlab.lib.pagesizes import A4
 class PDFGeneratorEngine:
     """
     Classe de nível sênior para processamento de arquivos.
-    Gerencia a conversão de imagens e a escrita do buffer do PDF.
+    Gerencia a conversão de imagens em grade (4 por página).
     """
     
     def __init__(self, callback_sucesso=None, callback_erro=None):
-        # Callbacks permitem que o motor avise à interface quando terminou,
-        # sem que o motor precise 'conhecer' a interface (Desacoplamento).
         self.callback_sucesso = callback_sucesso
         self.callback_erro = callback_erro
         self.formatos_aceitos = ('.jpg', '.jpeg', '.png', '.bmp')
 
     def processar_lista_arquivos(self, lista_arquivos, pasta_destino, nome_arquivo):
-        """
-        Inicia a geração do PDF a partir de uma lista específica de arquivos.
-        Executado em uma Thread separada para não congelar a UI.
-        """
+        """Inicia a geração em Thread para não travar a UI."""
         job = threading.Thread(
-            target=self._gerar_pdf_da_lista,
+            target=self._gerar_pdf_em_grade,
             args=(lista_arquivos, pasta_destino, nome_arquivo),
             daemon=True
         )
         job.start()
 
-    def _gerar_pdf_da_lista(self, caminhos_imagens, destino, nome):
-        """Método privado que executa a lógica pesada de I/O e conversão."""
+    def _gerar_pdf_em_grade(self, caminhos_imagens, destino, nome):
+        """Lógica de posicionamento 2x2 para reduzir o peso do PDF."""
         try:
-            # Garante que a pasta de destino exista
             if not os.path.exists(destino):
                 os.makedirs(destino, exist_ok=True)
 
             caminho_final = os.path.join(destino, f"{nome}.pdf")
-            
-            # Inicializa o Canvas do ReportLab (A folha em branco)
             pdf = canvas.Canvas(caminho_final, pagesize=A4)
             largura_a4, altura_a4 = A4
 
-            if not caminhos_imagens:
-                raise Exception("Nenhuma imagem selecionada para o processamento.")
+            # Definições da Grade
+            margem = 40
+            espacamento = 20
+            largura_box = (largura_a4 - (2 * margem) - espacamento) / 2
+            altura_box = (altura_a4 - (2 * margem) - espacamento) / 2
 
-            for caminho_img in caminhos_imagens:
+            for i, caminho_img in enumerate(caminhos_imagens):
                 if not os.path.exists(caminho_img):
                     continue
                 
-                # Processamento de Imagem com Pillow (PIL)
+                # Cálculo de posição (0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right)
+                pos = i % 4
+                coluna = pos % 2
+                linha = 1 - (pos // 2) # 1 é topo, 0 é base no ReportLab
+
+                x_base = margem + (coluna * (largura_box + espacamento))
+                y_base = margem + (linha * (altura_box + espacamento))
+
                 with Image.open(caminho_img) as img:
-                    # Converte para RGB (Removendo transparências que quebram o PDF)
                     if img.mode != 'RGB':
                         img = img.convert('RGB')
                     
-                    # Cálculo de Aspect Ratio (Redimensionamento Proporcional)
-                    # Deixamos uma margem de 40 pixels nas bordas
-                    largura_max = largura_a4 - 80
-                    altura_max = altura_a4 - 80
+                    img.thumbnail((largura_box, altura_box), Image.Resampling.LANCZOS)
+                    w_img, h_img = img.size
                     
-                    img.thumbnail((largura_max, altura_max), Image.Resampling.LANCZOS)
-                    largura_img, altura_img = img.size
+                    # Centralização no box
+                    x_final = x_base + (largura_box - w_img) / 2
+                    y_final = y_base + (altura_box - h_img) / 2
                     
-                    # Centralização Matemática na Página A4
-                    x_centrado = (largura_a4 - largura_img) / 2
-                    y_centrado = (altura_a4 - altura_img) / 2
-                    
-                    # Desenha a imagem no PDF e finaliza a página atual
-                    pdf.drawImage(caminho_img, x_centrado, y_centrado, width=largura_img, height=altura_img)
+                    pdf.drawImage(caminho_img, x_final, y_final, width=w_img, height=h_img)
+
+                # Fecha a página a cada 4 fotos ou no final da lista
+                if (i + 1) % 4 == 0 or (i + 1) == len(caminhos_imagens):
                     pdf.showPage() 
 
-            pdf.save() # Escreve o arquivo no disco
+            pdf.save()
 
-            # Comunicação de sucesso via callback
             if self.callback_sucesso:
                 self.callback_sucesso(caminho_final)
 
         except Exception as e:
-            # Comunicação de erro via callback
             if self.callback_erro:
                 self.callback_erro(str(e))
